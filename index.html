@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>IoT GPS Tracker - NighaTech</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 80vh;
+      width: 100%;
+    }
+    #info {
+      padding: 10px;
+      background: #222;
+      color: white;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="info">
+  <h2>Device: <span id="deviceId">TestDevice123</span></h2>
+  <div id="metrics">
+    Latitude: <span id="lat">--</span> | Longitude: <span id="lng">--</span> | Speed: <span id="speed">--</span> km/h | Altitude: <span id="alt">--</span> m | Satellites: <span id="sat">--</span>
+  </div>
+</div>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const deviceId = 'TestDevice123';
+  document.getElementById('deviceId').innerText = deviceId;
+
+  const map = L.map('map').setView([16.5062, 80.6480], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  let marker = null;
+  let polyline = null;
+  let path = [];
+
+  async function fetchLocationData() {
+    try {
+      const response = await fetch(`http://localhost:8000/api/location/${deviceId}`);
+      if (!response.ok) throw new Error('Network response not ok');
+      const data = await response.json();
+
+      if (data.length === 0) return;
+
+      const last = data[data.length - 1];
+      document.getElementById('lat').innerText = last.latitude.toFixed(6);
+      document.getElementById('lng').innerText = last.longitude.toFixed(6);
+      document.getElementById('speed').innerText = last.speed.toFixed(1);
+      document.getElementById('alt').innerText = last.altitude.toFixed(1);
+      document.getElementById('sat').innerText = last.satellites;
+
+      path = data.map(d => [d.latitude, d.longitude]);
+
+      if (!marker) {
+        marker = L.marker(path[path.length - 1]).addTo(map);
+      } else {
+        marker.setLatLng(path[path.length - 1]);
+      }
+
+      if (polyline) {
+        polyline.setLatLngs(path);
+      } else {
+        polyline = L.polyline(path, { color: 'red' }).addTo(map);
+      }
+
+      const bounds = L.latLngBounds(path);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } catch (err) {
+      console.error('Failed to fetch location data:', err);
+    }
+  }
+
+  fetchLocationData();
+  setInterval(fetchLocationData, 5000);
+</script>
+
+</body>
+</html>
